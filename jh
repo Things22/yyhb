@@ -1,0 +1,100 @@
+// ==SE_module==
+// name: open_chat_with_non_friend
+// displayName: Open Chat with Non-Friend
+// description: Opens a chat with a non-friend user. Configurable via settings.
+// version: 1.1
+// author: You
+// permissions: unsafe-classloader
+// ==/SE_module==
+
+const { messaging } = require("messaging");
+const { create } = require("interface-manager");
+const { config } = require("config");
+
+// الاسم الافتراضي (اختياري)
+const DEFAULT_USERNAME = "example_user";
+
+module.onSnapEnhanceLoad = (context) => {
+    // تحميل الإعدادات
+    config.load();
+
+    // إنشاء واجهة في إعدادات SnapEnhance
+    create("settings", (builder) => {
+        builder.column((col) => {
+            col.text("Enter target username:")
+                .padding(8);
+
+            const input = col.textInput(
+                "e.g. john_doe",
+                config.get("target_username", DEFAULT_USERNAME),
+                (value) => {
+                    config.set("target_username", value.trim());
+                    config.save(); // حفظ تلقائي عند التغيير
+                    logInfo("Saved username: " + value);
+                }
+            );
+            input
+                .singleLine(true)
+                .maxLines(1)
+                .padding(8);
+
+            col.button("Open Chat Now", () => {
+                const username = config.get("target_username", "").trim();
+                if (!username) {
+                    shortToast("Username is empty!");
+                    return;
+                }
+                openChatWith(username);
+            }).padding(16);
+        });
+    });
+};
+
+module.onSnapMainActivityCreate = (activity) => {
+    // عند فتح سناب شات، افتح المحادثة تلقائيًا
+    const username = config.get("target_username", "").trim();
+    if (username) {
+        logInfo("Auto-opening chat with: " + username);
+        openChatWith(username);
+    }
+};
+
+// دالة لفتح المحادثة مع المستخدم
+function openChatWith(username) {
+    longToast("Opening chat with @" + username + "...");
+
+    messaging.getOneOnOneConversationIds([username], (error, result) => {
+        if (error) {
+            logError("Failed to get conversation: " + error);
+            shortToast("Error: " + error);
+            return;
+        }
+
+        if (!result || result.length === 0) {
+            logError("No conversation created for: " + username);
+            shortToast("Failed to create chat with @" + username);
+            return;
+        }
+
+        const { conversationId, userId } = result[0];
+        logInfo("Conversation ID: " + conversationId);
+        logInfo("User ID: " + userId);
+
+        // إرسال رسالة فارغة أو رسالة ترحيب (اختياري)
+        // يمكنك تعطيل الإرسال إذا كنت لا تريد إرسال شيء
+        const messageToSend = ""; // اتركها فارغة لعدم الإرسال، أو ضع رسالة مثل "Hello"
+
+        if (messageToSend) {
+            messaging.sendChatMessage(conversationId, messageToSend, (sendError) => {
+                if (sendError) {
+                    logError("Send failed: " + sendError);
+                    shortToast("Chat opened, but message failed");
+                } else {
+                    shortToast("Chat opened & message sent!");
+                }
+            });
+        } else {
+            shortToast("Chat opened with @" + username);
+        }
+    });
+}
