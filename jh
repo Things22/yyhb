@@ -1,50 +1,40 @@
 // ==SE_module==
-// name: auto_open_veteran
-// displayName: uto Open Chat with veteran
-// description: utomatically opens a chat with when Snapchat starts.
+// name: auto_open_veteran0
+// displayName: Auto Open Chat with veteran0
+// description: Automatically opens a chat with veteran0 when Snapchat starts.
 // version: 1.0
 // author: You
 // executionSides: core
 // ==/SE_module==
 
 module.onSnapMainActivityCreate = (activity) => {
-    // التأكد من توفر وحدة الرسائل
     if (typeof messaging === "undefined") {
         console.error("messaging module is not available!");
         return;
     }
 
-    const username = "veteran0"; // المستخدم المستهدف
+    const username = "veteran0";
     console.log("Trying to open chat with @" + username);
 
-    // تأخير بسيط لضمان جاهزية النظام
     setTimeout(() => {
         messaging.getOneOnOneConversationIds([username], (error, result) => {
-            if (error) {
-                console.error("Failed to get conversation: " + error);
-                return;
-            }
-
-            if (!result || result.length === 0) {
-                console.error("No conversation created for @" + username);
+            if (error || !result || result.length === 0) {
+                const errorMsg = error ? error : "No conversation created";
+                console.error("Failed to open chat: " + errorMsg);
                 return;
             }
 
             const { conversationId } = result[0];
-            console.info("Chat opened successfully. Conversation ID: " + conversationId);
+            console.info("Conversation opened: " + conversationId);
 
-            // (اختياري) إرسال رسالة فارغة لتفعيل المحادثة
-            // يمكنك إزالة هذا الجزء إذا لم ترد إرسال أي شيء
+            // إرسال رسالة فارغة لتفعيل المحادثة (اختياري)
             messaging.sendChatMessage(conversationId, "", (sendError) => {
                 if (sendError) {
-                    console.warn("Message send failed (optional): " + sendError);
-                } else {
-                    console.info("Empty message sent to @" + username);
+                    console.warn("Send failed (optional): " + sendError);
                 }
             });
 
-            // إظهار رسالة للمستخدم
             longToast("Chat with @veteran0 opened!");
         });
-    }, 1500); // تأخير 1.5 ثانية كافي عادةً
+    }, 1500);
 };
