@@ -1,40 +1,34 @@
 // ==SE_module==
 // name: auto_open_veteran0
 // displayName: Auto Open Chat with veteran0
-// description: Automatically opens a chat with veteran0 when Snapchat starts.
+// description: Opens chat with veteran0 when Snapchat starts.
 // version: 1.0
 // author: You
 // executionSides: core
 // ==/SE_module==
 
-module.onSnapMainActivityCreate = (activity) => {
+module.onSnapMainActivityCreate = () => {
     if (typeof messaging === "undefined") {
-        console.error("messaging module is not available!");
+        console.error("messaging not available");
         return;
     }
 
     const username = "veteran0";
-    console.log("Trying to open chat with @" + username);
 
     setTimeout(() => {
         messaging.getOneOnOneConversationIds([username], (error, result) => {
             if (error || !result || result.length === 0) {
-                const errorMsg = error ? error : "No conversation created";
-                console.error("Failed to open chat: " + errorMsg);
+                console.error("Failed to open chat with " + username);
                 return;
             }
 
             const { conversationId } = result[0];
-            console.info("Conversation opened: " + conversationId);
+            console.info("Chat opened: " + conversationId);
 
-            // إرسال رسالة فارغة لتفعيل المحادثة (اختياري)
-            messaging.sendChatMessage(conversationId, "", (sendError) => {
-                if (sendError) {
-                    console.warn("Send failed (optional): " + sendError);
-                }
-            });
+            // إرسال رسالة فارغة لتفعيل المحادثة
+            messaging.sendChatMessage(conversationId, "", () => {});
 
-            longToast("Chat with @veteran0 opened!");
+            longToast("Chat with @" + username + " opened!");
         });
     }, 1500);
 };
