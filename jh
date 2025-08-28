@@ -1,85 +1,23 @@
 // ==SE_module==
-// name: open_chat_with_non_friend
-// displayName: Open Chat with Non-Friend
-// description: Open chat with non-friend via settings.
-// version: 1.4
+// name: test_settings
+// displayName: Test Settings
+// version: 1.0
 // author: You
-// permissions: unsafe-classloader
-// executionSides: core, manager
+// executionSides: manager
 // ==/SE_module==
 
-if (currentSide === "manager") {
-    module.onSnapEnhanceLoad = () => {
-        config.load();
+module.onSnapEnhanceLoad = () => {
+    shortToast("Test Settings Loaded!");
 
-        create("settings", (builder) => {
-            builder.column((col) => {
-                col.text("Target Username:")
-                    .padding(8);
+    create("settings", (builder) => {
+        builder.column((col) => {
+            col.text("🎉 This is a test setting!")
+                .color(0xFF00FF00) // أخضر
+                .fontSize(18);
 
-                const input = col.textInput(
-                    "username",
-                    config.get("target_username", ""),
-                    (value) => {
-                        config.set("target_username", value.trim());
-                        config.save();
-                    }
-                );
-                input.singleLine(true).maxLines(1).padding(8);
-
-                col.button("Open Chat", () => {
-                    const username = config.get("target_username", "").trim();
-                    if (!username) {
-                        shortToast("Enter a username!");
-                        return;
-                    }
-                    ipc.emit("open_chat_request", username);
-                    shortToast("Opening chat with @" + username);
-                }).padding(16);
+            col.button("Click Me", () => {
+                longToast("Button clicked!");
             });
         });
-    };
-}
-
-if (currentSide === "core") {
-    // ✅ فقط في core side نستخدم messaging
-    module.onSnapMainActivityCreate = () => {
-        // الاستماع للطلبات من الواجهة
-        ipc.on("open_chat_request", (args) => {
-            const username = args[0];
-            if (username) openChat(username);
-        });
-
-        // فتح تلقائي عند التشغيل (اختياري)
-        const savedUsername = config.get("target_username", "").trim();
-        if (savedUsername) {
-            setTimeout(() => openChat(savedUsername), 2000);
-        }
-    };
-
-    // ✅ تعريف الدالة هنا فقط — لا توجد إشارة إلى messaging في manager
-    function openChat(username) {
-        shortToast("Opening chat with @" + username);
-
-        if (typeof messaging === "undefined") {
-            logError("messaging module not available!");
-            return;
-        }
-
-        messaging.getOneOnOneConversationIds([username], (error, result) => {
-            if (error || !result || result.length === 0) {
-                const msg = error ? error : "No conversation created";
-                logError("Failed: " + msg);
-                shortToast("Failed to open chat");
-                return;
-            }
-
-            const { conversationId } = result[0];
-            logInfo("Chat opened: " + conversationId);
-
-            // (اختياري) إرسال رسالة فارغة لتفعيل المحادثة
-            // messaging.sendChatMessage(conversationId, "", () => {}); // غير مطلوب
-            shortToast("Chat with @" + username + " is now active.");
-        });
-    }
-}
+    });
+};
