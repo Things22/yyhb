@@ -1,26 +1,24 @@
 // ==SE_module==
 // name: open_chat_with_non_friend
 // displayName: Open Chat with Non-Friend
-// description: Opens a chat with a non-friend user via settings.
-// version: 1.3
+// description: Open chat with non-friend via settings.
+// version: 1.4
 // author: You
 // permissions: unsafe-classloader
 // executionSides: core, manager
 // ==/SE_module==
 
 if (currentSide === "manager") {
-    // --- جانب SnapEnhance (واجهة الإعدادات) ---
     module.onSnapEnhanceLoad = () => {
-        // `config` و `ipc` و `interface-manager` متوفرة تلقائيًا
         config.load();
 
         create("settings", (builder) => {
             builder.column((col) => {
-                col.text("Enter target username:")
+                col.text("Target Username:")
                     .padding(8);
 
                 const input = col.textInput(
-                    "e.g. john_doe",
+                    "username",
                     config.get("target_username", ""),
                     (value) => {
                         config.set("target_username", value.trim());
@@ -29,15 +27,14 @@ if (currentSide === "manager") {
                 );
                 input.singleLine(true).maxLines(1).padding(8);
 
-                col.button("Open Chat Now", () => {
+                col.button("Open Chat", () => {
                     const username = config.get("target_username", "").trim();
                     if (!username) {
-                        shortToast("Username is empty!");
+                        shortToast("Enter a username!");
                         return;
                     }
-                    // إرسال الطلب إلى جانب سناب شات
                     ipc.emit("open_chat_request", username);
-                    shortToast("Request sent to Snapchat...");
+                    shortToast("Opening chat with @" + username);
                 }).padding(16);
             });
         });
@@ -45,63 +42,44 @@ if (currentSide === "manager") {
 }
 
 if (currentSide === "core") {
-    // --- جانب سناب شات (فتح المحادثة) ---
-    module.onSnapMainActivityCreate = (activity) => {
-        const username = config.get("target_username", "").trim();
-        if (username) {
-            // تأخير بسيط لضمان جاهزية النظام
-            setTimeout(() => {
-                openChatWith(username);
-            }, 2000);
-        }
-
+    // ✅ فقط في core side نستخدم messaging
+    module.onSnapMainActivityCreate = () => {
+        // الاستماع للطلبات من الواجهة
         ipc.on("open_chat_request", (args) => {
             const username = args[0];
-            if (username) openChatWith(username);
+            if (username) openChat(username);
         });
+
+        // فتح تلقائي عند التشغيل (اختياري)
+        const savedUsername = config.get("target_username", "").trim();
+        if (savedUsername) {
+            setTimeout(() => openChat(savedUsername), 2000);
+        }
     };
 
-    function openChatWith(username) {
-        shortToast("Opening chat with @" + username + "...");
+    // ✅ تعريف الدالة هنا فقط — لا توجد إشارة إلى messaging في manager
+    function openChat(username) {
+        shortToast("Opening chat with @" + username);
 
-        // تحقق من توفر messaging
-        if (typeof messaging === "undefined" || !messaging) {
-            logError("Error: messaging module is not available!");
-            shortToast("Messaging not available");
+        if (typeof messaging === "undefined") {
+            logError("messaging module not available!");
             return;
         }
 
         messaging.getOneOnOneConversationIds([username], (error, result) => {
-            if (error) {
-                logError("Failed to get conversation: " + error);
-                shortToast("Error: " + error);
-                return;
-            }
-
-            if (!result || result.length === 0) {
-                logError("No conversation created for: " + username);
-                shortToast("Failed to create chat with @" + username);
+            if (error || !result || result.length === 0) {
+                const msg = error ? error : "No conversation created";
+                logError("Failed: " + msg);
+                shortToast("Failed to open chat");
                 return;
             }
 
             const { conversationId } = result[0];
-            logInfo("Conversation ID: " + conversationId);
+            logInfo("Chat opened: " + conversationId);
 
-            // (اختياري) إرسال رسالة لتفعيل المحادثة
-            const messageToSend = ""; // غيرها إذا أردت إرسال رسالة
-
-            if (messageToSend) {
-                messaging.sendChatMessage(conversationId, messageToSend, (sendError) => {
-                    if (sendError) {
-                        logError("Send failed: " + sendError);
-                        shortToast("Open, but send failed");
-                    } else {
-                        shortToast("Message sent!");
-                    }
-                });
-            } else {
-                shortToast("Chat opened with @" + username);
-            }
+            // (اختياري) إرسال رسالة فارغة لتفعيل المحادثة
+            // messaging.sendChatMessage(conversationId, "", () => {}); // غير مطلوب
+            shortToast("Chat with @" + username + " is now active.");
         });
     }
 }
