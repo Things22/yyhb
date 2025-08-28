@@ -2,99 +2,109 @@
 // name: open_chat_with_non_friend
 // displayName: Open Chat with Non-Friend
 // description: Opens a chat with a non-friend user. Configurable via settings.
-// version: 1.1
+// version: 1.2
 // author: You
 // permissions: unsafe-classloader
+// executionSides: core, manager
 // ==/SE_module==
 
-const { messaging } = require("messaging");
-const { create } = require("interface-manager");
-const { config } = require("config");
+if (currentSide === "manager") {
+    // --- جانب SnapEnhance (الإعدادات) ---
+    const { create } = require("interface-manager");
+    const { config } = require("config");
+    const { ipc } = require("ipc");
 
-// الاسم الافتراضي (اختياري)
-const DEFAULT_USERNAME = "example_user";
+    module.onSnapEnhanceLoad = () => {
+        config.load();
 
-module.onSnapEnhanceLoad = (context) => {
-    // تحميل الإعدادات
-    config.load();
+        create("settings", (builder) => {
+            builder.column((col) => {
+                col.text("Enter target username:")
+                    .padding(8);
 
-    // إنشاء واجهة في إعدادات SnapEnhance
-    create("settings", (builder) => {
-        builder.column((col) => {
-            col.text("Enter target username:")
-                .padding(8);
+                const input = col.textInput(
+                    "e.g. john_doe",
+                    config.get("target_username", ""),
+                    (value) => {
+                        config.set("target_username", value.trim());
+                        config.save();
+                    }
+                );
+                input.singleLine(true).maxLines(1).padding(8);
 
-            const input = col.textInput(
-                "e.g. john_doe",
-                config.get("target_username", DEFAULT_USERNAME),
-                (value) => {
-                    config.set("target_username", value.trim());
-                    config.save(); // حفظ تلقائي عند التغيير
-                    logInfo("Saved username: " + value);
-                }
-            );
-            input
-                .singleLine(true)
-                .maxLines(1)
-                .padding(8);
-
-            col.button("Open Chat Now", () => {
-                const username = config.get("target_username", "").trim();
-                if (!username) {
-                    shortToast("Username is empty!");
-                    return;
-                }
-                openChatWith(username);
-            }).padding(16);
-        });
-    });
-};
-
-module.onSnapMainActivityCreate = (activity) => {
-    // عند فتح سناب شات، افتح المحادثة تلقائيًا
-    const username = config.get("target_username", "").trim();
-    if (username) {
-        logInfo("Auto-opening chat with: " + username);
-        openChatWith(username);
-    }
-};
-
-// دالة لفتح المحادثة مع المستخدم
-function openChatWith(username) {
-    longToast("Opening chat with @" + username + "...");
-
-    messaging.getOneOnOneConversationIds([username], (error, result) => {
-        if (error) {
-            logError("Failed to get conversation: " + error);
-            shortToast("Error: " + error);
-            return;
-        }
-
-        if (!result || result.length === 0) {
-            logError("No conversation created for: " + username);
-            shortToast("Failed to create chat with @" + username);
-            return;
-        }
-
-        const { conversationId, userId } = result[0];
-        logInfo("Conversation ID: " + conversationId);
-        logInfo("User ID: " + userId);
-
-        // إرسال رسالة فارغة أو رسالة ترحيب (اختياري)
-        // يمكنك تعطيل الإرسال إذا كنت لا تريد إرسال شيء
-        const messageToSend = ""; // اتركها فارغة لعدم الإرسال، أو ضع رسالة مثل "Hello"
-
-        if (messageToSend) {
-            messaging.sendChatMessage(conversationId, messageToSend, (sendError) => {
-                if (sendError) {
-                    logError("Send failed: " + sendError);
-                    shortToast("Chat opened, but message failed");
-                } else {
-                    shortToast("Chat opened & message sent!");
-                }
+                col.button("Open Chat Now", () => {
+                    const username = config.get("target_username", "").trim();
+                    if (!username) {
+                        shortToast("Username is empty!");
+                        return;
+                    }
+                    // إرسال الأمر إلى جانب سناب شات
+                    ipc.emit("open_chat_request", username);
+                    shortToast("Request sent to Snapchat...");
+                }).padding(16);
             });
-        } else {
-            shortToast("Chat opened with @" + username);
+        });
+    };
+}
+
+if (currentSide === "core") {
+    // --- جانب سناب شات (التنفيذ) ---
+    const { messaging } = require("messaging");
+    const { config } = require("config");
+    const { ipc } = require("ipc");
+
+    module.onSnapMainActivityCreate = (activity) => {
+        // عند فتح سناب شات، تحقق من وجود اسم محفوظ
+        const username = config.get("target_username", "").trim();
+        if (username) {
+            setTimeout(() => {
+                openChatWith(username);
+            }, 2000); // تأخير بسيط لضمان جاهزية النظام
         }
-    });
+
+        // الاستماع لأوامر الفتح من واجهة الإعدادات
+        ipc.on("open_chat_request", (args) => {
+            const username = args[0];
+            if (username) {
+                openChatWith(username);
+            }
+        });
+    };
+
+    function openChatWith(username) {
+        longToast("Opening chat with @" + username + "...");
+
+        messaging.getOneOnOneConversationIds([username], (error, result) => {
+            if (error) {
+                logError("Failed to get conversation: " + error);
+                shortToast("Error: " + error);
+                return;
+            }
+
+            if (!result || result.length === 0) {
+                logError("No conversation created for: " + username);
+                shortToast("Failed to create chat with @" + username);
+                return;
+            }
+
+            const { conversationId } = result[0];
+            logInfo("Conversation ID: " + conversationId);
+
+            // (اختياري) إرسال رسالة فارغة لتفعيل المحادثة
+            const messageToSend = ""; // غيرها لنص إذا أردت إرسال رسالة
+
+            if (messageToSend) {
+                messaging.sendChatMessage(conversationId, messageToSend, (sendError) => {
+                    if (sendError) {
+                        logError("Send failed: " + sendError);
+                        shortToast("Chat opened, but message failed");
+                    } else {
+                        shortToast("Message sent to @" + username);
+                    }
+                });
+            } else {
+                shortToast("Chat opened with @" + username);
+            }
+        });
+    }
 }
