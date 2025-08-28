@@ -1,29 +1,40 @@
 // ==SE_module==
-// name: get_conversation_id
-// displayName: Get Conversation ID by Username
-// description: يستخرج Conversation ID لمحادثة قديمة بناءً على اليوزرنيم
+// name: auto_open_chat
+// displayName: Auto Open Chat
+// description: يفتح دردشة الصديق khalid-sawalha مباشرة عند فتح سناب شات
 // version: 1.0
-// author: YourName
+// author: You
 // ==/SE_module==
 
-module.onSnapEnhanceLoad = (context) => {
+module.onSnapMainActivityCreate = (activity) => {
     try {
-        const dbHelper = Java.use("com.snapchat.android.persistence.DatabaseHelper");
-        const db = dbHelper.getDatabase();  // SQLiteDatabase object
+        // 🔹 اسم المستخدم المستهدف
+        const targetUsername = "khalid-sawalha";
 
-        // بدّل "oldfriend123" باليوزرنيم اللي بدك تبحث عنه
-        const username = "oldfriend123";
-        const query = "SELECT conversation_id FROM conversations WHERE participant_id = ?";
-        const cursor = db.rawQuery(query, [username]);
+        // الوصول لمدير المحادثات
+        const ConversationManager = Java.use("com.snapchat.android.chat.ConversationManager");
+        const convManager = ConversationManager.getInstance();
 
-        if (cursor.moveToFirst()) {
-            const convId = cursor.getString(0);
-            longToast("✅ Conversation ID: " + convId);
+        // البحث عن محادثة الصديق
+        const conversation = convManager.getConversation(targetUsername);
+
+        if (conversation != null) {
+            const ChatActivity = Java.use("com.snapchat.android.chat.activity.ChatActivity");
+            const Intent = Java.use("android.content.Intent");
+
+            const intent = new Intent(activity, ChatActivity.class);
+            intent.putExtra("conversation_id", conversation.getId());
+
+            activity.startActivity(intent);
+            longToast("✅ تم فتح دردشة: " + targetUsername);
         } else {
-            longToast("❌ ما لقيت محادثة لهاليوزر: " + username);
+            longToast("❌ ما لقيت محادثة مع: " + targetUsername);
         }
-        cursor.close();
     } catch (err) {
-        longToast("خطأ أثناء البحث: " + err);
+        longToast("⚠️ خطأ: " + err);
     }
+};
+
+module.onUnload = () => {
+    shortToast("📴 سكربت Auto Open Chat تعطّل");
 };
